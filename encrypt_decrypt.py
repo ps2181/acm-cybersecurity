@@ -1,35 +1,69 @@
-from Crypto.Cipher import AES
-from Crypto.Util.Padding import pad,unpad
+from Crypto.Cipher import DES
 from PIL import Image
+import os
 
-#generating a random key
-key = b'\x91\x1fV#\x11\x86\x7f\x8f\xfa@\x85\x9a\x15\x0e\xd6Y1kI\xfe\xdc\xcf\xea\xe1p\x01\x12\x08\x9e\xf9\x91'
+def encrypt_image(image_path, key):
+    # Open the image
+    image = Image.open(image_path)
 
-original_image_path=""
+    # Convert the image to RGB mode (if it's not already)
+    image = image.convert('RGB')
 
-#opening the file in bytes
-with open(original_image_path,'rb') as f:
-    original_image_bytes = f.read()
+    # Convert the image data to bytes
+    image_bytes = image.tobytes()
 
-#padding the bytes to 16 according to AES algo
-padded_image_bytes=pad(original_image_bytes,AES.block_size)
+    # Calculate the required padding size
+    block_size = DES.block_size
+    padding_size = (block_size - len(image_bytes) % block_size) % block_size
 
-#creating a cipher object
-cipher = AES.new(key,AES.MODE_ECB)
+    # Pad the image bytes with zero bytes
+    padded_image_bytes = image_bytes + bytes([0] * padding_size)
 
-#encrypt the image
-encrypted_image_bytes = cipher.encrypt(padded_image_bytes)
+    # Create a cipher object
+    cipher = DES.new(key, DES.MODE_ECB)
 
-with open('','wb') as f:
-    f.write(encrypted_image_bytes)
+    # Encrypt the image
+    encrypted_image_bytes = cipher.encrypt(padded_image_bytes)
 
-#decrypting the image
-decrypted_image_bytes = cipher.decrypt(encrypted_image_bytes)
+    # Create a new image from the encrypted bytes
+    encrypted_image = Image.frombytes('RGB', image.size, encrypted_image_bytes)
 
-#removing the padded bits
-unpadded_image_bytes = unpad(decrypted_image_bytes, AES.block_size)
+    return encrypted_image
 
-#decrypting the image
-decrypted_image = Image.frombytes('RGB',(512,512),unpadded_image_bytes)
+def decrypt_image(encrypted_image, key):
+    # Convert the encrypted image to bytes
+    encrypted_image_bytes = encrypted_image.tobytes()
 
-decrypted_image.save('')
+    # Create a cipher object for decryption
+    cipher = DES.new(key, DES.MODE_ECB)
+
+    # Decrypt the image
+    decrypted_image_bytes = cipher.decrypt(encrypted_image_bytes)
+
+    # Remove the zero padding bytes from the decrypted bytes
+    unpadded_image_bytes = decrypted_image_bytes.rstrip(b'\x00')
+
+    # Create a new image from the decrypted bytes
+    decrypted_image = Image.frombytes('RGB', encrypted_image.size, unpadded_image_bytes)
+
+    return decrypted_image
+
+# Example usage
+image_path = r'D:\file_encrypt_decrypt\1.jpg'  
+key = b'\x91\x1fV#\x11\x86\x7f\x8f'  
+
+try:
+    # Encrypt the image
+    encrypted_image = encrypt_image(image_path, key)
+    encrypted_image.save(r'D:\file_encrypt_decrypt\encrypt.png')
+
+    # Decrypt the image
+    decrypted_image = decrypt_image(encrypted_image, key)
+    decrypted_image.save(r'D:\file_encrypt_decrypt\decrypt.png')
+
+    decrypted_image.show()  # Display the decrypted image
+
+except FileNotFoundError:
+    print("File not found.")
+except Exception as e:
+    print(f"Error occurred: {str(e)}")
